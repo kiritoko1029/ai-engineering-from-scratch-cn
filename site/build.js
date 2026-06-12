@@ -274,6 +274,28 @@ function lessonTranslations(relPath) {
   };
 }
 
+function copyLessonDocs(phases) {
+  const targetRoot = path.join(__dirname, 'phases');
+  fs.rmSync(targetRoot, { recursive: true, force: true });
+  let copied = 0;
+  for (const phase of phases) {
+    for (const lesson of phase.lessons) {
+      const relPath = lessonPath(lesson.url);
+      if (!relPath) continue;
+      const srcDocs = path.join(REPO_ROOT, relPath, 'docs');
+      const outDocs = path.join(__dirname, relPath, 'docs');
+      for (const lang of ['en', 'zh']) {
+        const src = path.join(srcDocs, `${lang}.md`);
+        if (!fs.existsSync(src)) continue;
+        fs.mkdirSync(outDocs, { recursive: true });
+        fs.copyFileSync(src, path.join(outDocs, `${lang}.md`));
+        copied++;
+      }
+    }
+  }
+  console.log(`   copied ${copied} lesson doc file(s) into site/phases/`);
+}
+
 // ─── Parse glossary/terms.md ──────────────────────────────────────────
 function parseGlossary(content) {
   const terms = [];
@@ -467,6 +489,7 @@ const ARTIFACTS = ${JSON.stringify(artifacts, null, 2)};
   fs.writeFileSync(OUTPUT_PATH, output, 'utf8');
   console.log(`\n✅ Generated ${OUTPUT_PATH}`);
 
+  copyLessonDocs(phases);
   syncCounts(totalLessons, phases.length, artifacts.length);
   syncReadme(totalLessons);
   writeSitemap(phases, glossaryTerms.length);

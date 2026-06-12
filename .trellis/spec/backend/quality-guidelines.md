@@ -78,6 +78,7 @@ Questions to answer:
 - Target: `docs/zh.md`.
 - Existing `docs/zh.md` is skipped unless `--force` is passed.
 - `site/lesson.html?path=<lesson>&lang=zh` loads Chinese when present and falls back to English with a visible notice when missing.
+- `site/build.js` copies lesson Markdown into `site/phases/**/docs/` so Vercel's `outputDirectory: "site"` can serve the docs.
 - `site/build.js` and `scripts/build_catalog.py` expose `translations.zh` based on `docs/zh.md` presence.
 
 ### 4. Validation & Error Matrix
