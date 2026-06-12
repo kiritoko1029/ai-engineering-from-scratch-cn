@@ -212,6 +212,50 @@
       color: var(--ink-mute);
     }
 
+    .language-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--rule-soft);
+      padding: 3px;
+      background: var(--bg-surface);
+    }
+
+    .language-toggle a {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      text-decoration: none;
+      border: 1px solid transparent;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+
+    .language-toggle a:hover,
+    .language-toggle a.active {
+      color: var(--blueprint);
+      border-color: var(--blueprint);
+      background: var(--blueprint-tint);
+    }
+
+    .translation-note {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.45;
+      color: var(--ink-soft);
+      border: 1px solid var(--rule-soft);
+      background: var(--bg-surface);
+      padding: 10px 12px;
+      margin-bottom: 22px;
+    }
+
+    .translation-note strong {
+      color: var(--blueprint);
+      font-weight: 500;
+    }
+
     .lesson-error {
       text-align: left;
       padding: 64px 0;
@@ -1593,6 +1637,10 @@
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
       </button>
+      <nav class="language-toggle" id="languageToggle" aria-label="Lesson language">
+        <a href="#" data-lang-choice="en">EN</a>
+        <a href="#" data-lang-choice="zh">中文</a>
+      </nav>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" type="button">
         <span class="theme-icon" id="themeIcon">N</span>
       </button>
@@ -1698,6 +1746,8 @@
 
       var params = new URLSearchParams(window.location.search);
       var lessonPath = params.get('path');
+      var requestedLang = normalizeLang(params.get('lang') || localStorage.getItem('lessonLang') || 'en');
+      var activeLang = requestedLang;
 
       if (!lessonPath) {
         showError('No lesson path specified', 'Add ?path=phases/01-math-foundations/01-linear-algebra-intuition to the URL.');
@@ -1748,9 +1798,59 @@
       }
 
       buildSidebar();
+      initLanguageToggle();
       initSidebarToggle();
       initScrollProgress();
       fetchLesson(lessonPath);
+
+      function normalizeLang(value) {
+        return value === 'zh' ? 'zh' : 'en';
+      }
+
+      function langQuery(lang) {
+        return lang && lang !== 'en' ? '&lang=' + encodeURIComponent(lang) : '';
+      }
+
+      function lessonHref(path, lang) {
+        return 'lesson.html?path=' + encodeURIComponent(path) + langQuery(lang || activeLang);
+      }
+
+      function rawLessonUrl(path, lang) {
+        return 'https://raw.githubusercontent.com/rohitg00/ai-engineering-from-scratch/main/' +
+          path + '/docs/' + normalizeLang(lang) + '.md';
+      }
+
+      function localLessonUrl(path, lang) {
+        return '../' + path + '/docs/' + normalizeLang(lang) + '.md';
+      }
+
+      function updateLanguageToggle() {
+        var toggle = document.getElementById('languageToggle');
+        if (!toggle) return;
+        var choices = toggle.querySelectorAll('[data-lang-choice]');
+        for (var i = 0; i < choices.length; i++) {
+          var choice = choices[i];
+          var lang = choice.getAttribute('data-lang-choice');
+          choice.classList.toggle('active', lang === activeLang);
+          choice.setAttribute('href', lessonHref(lessonPath, lang));
+          choice.setAttribute('aria-current', lang === activeLang ? 'page' : 'false');
+        }
+      }
+
+      function initLanguageToggle() {
+        var toggle = document.getElementById('languageToggle');
+        if (!toggle) return;
+        updateLanguageToggle();
+        toggle.addEventListener('click', function (event) {
+          var link = event.target.closest('[data-lang-choice]');
+          if (!link) return;
+          event.preventDefault();
+          var nextLang = normalizeLang(link.getAttribute('data-lang-choice'));
+          localStorage.setItem('lessonLang', nextLang);
+          var nextUrl = lessonHref(lessonPath, nextLang);
+          window.location.href = nextUrl;
+        });
+      }
 
       function extractPhaseSlug(phase, index) {
         if (phase.url) {
@@ -1787,13 +1887,13 @@
             var pp = PHASES[prevPhaseIdx];
             var ppSlug = extractPhaseSlug(pp, prevPhaseIdx);
             var ppFirstLesson = pp.lessons[0] ? extractLessonSlug(pp.lessons[0], 0) : '';
-            html += '<a href="lesson.html?path=phases/' + ppSlug + '/' + ppFirstLesson + '">&larr; Phase ' + String(pp.id).padStart(2, '0') + ': ' + escapeHtml(pp.name) + '</a>';
+            html += '<a href="' + lessonHref('phases/' + ppSlug + '/' + ppFirstLesson) + '">&larr; Phase ' + String(pp.id).padStart(2, '0') + ': ' + escapeHtml(pp.name) + '</a>';
           }
           if (nextPhaseIdx >= 0) {
             var np = PHASES[nextPhaseIdx];
             var npSlug = extractPhaseSlug(np, nextPhaseIdx);
             var npFirstLesson = np.lessons[0] ? extractLessonSlug(np.lessons[0], 0) : '';
-            html += '<a href="lesson.html?path=phases/' + npSlug + '/' + npFirstLesson + '">Phase ' + String(np.id).padStart(2, '0') + ': ' + escapeHtml(np.name) + ' &rarr;</a>';
+            html += '<a href="' + lessonHref('phases/' + npSlug + '/' + npFirstLesson) + '">Phase ' + String(np.id).padStart(2, '0') + ': ' + escapeHtml(np.name) + ' &rarr;</a>';
           }
           html += '</div>';
         }
@@ -1808,7 +1908,7 @@
             var isActive = lesSlug === currentLessonSlug;
             var lesReadable = les.status === 'complete' || !!les.url;
             if (lesReadable) {
-              html += '<a class="sidebar-lesson-link' + (isActive ? ' active' : '') + '" href="lesson.html?path=phases/' + pSlugCurrent + '/' + lesSlug + '">';
+              html += '<a class="sidebar-lesson-link' + (isActive ? ' active' : '') + '" href="' + lessonHref('phases/' + pSlugCurrent + '/' + lesSlug) + '">';
             } else {
               html += '<span class="sidebar-lesson-link disabled">';
             }
@@ -1850,18 +1950,54 @@
         }, { passive: true });
       }
 
-      function fetchLesson(path) {
-        var rawUrl = 'https://raw.githubusercontent.com/rohitg00/ai-engineering-from-scratch/main/' + path + '/docs/en.md';
-        var quizUrl = 'https://raw.githubusercontent.com/rohitg00/ai-engineering-from-scratch/main/' + path + '/quiz.json';
-
-        fetch(rawUrl)
-          .then(function (res) {
+      function fetchTextWithFallback(urls) {
+        var idx = 0;
+        function next() {
+          if (idx >= urls.length) return Promise.reject(new Error('fetch-failed'));
+          var url = urls[idx++];
+          return fetch(url).then(function (res) {
             if (!res.ok) throw new Error('fetch-failed');
             return res.text();
+          }).catch(function () {
+            return next();
+          });
+        }
+        return next();
+      }
+
+      function fetchLessonMarkdown(path, lang) {
+        return fetchTextWithFallback([
+          localLessonUrl(path, lang),
+          rawLessonUrl(path, lang)
+        ]);
+      }
+
+      function fetchLesson(path) {
+        var quizUrl = 'https://raw.githubusercontent.com/rohitg00/ai-engineering-from-scratch/main/' + path + '/quiz.json';
+
+        fetchLessonMarkdown(path, requestedLang)
+          .catch(function () {
+            if (requestedLang === 'en') throw new Error('fetch-failed');
+            activeLang = 'en';
+            updateLanguageToggle();
+            return fetchLessonMarkdown(path, 'en').then(function (md) {
+              return {
+                md: md,
+                fallback: true
+              };
+            });
           })
-          .then(function (md) {
+          .then(function (result) {
+            if (typeof result === 'string') {
+              activeLang = requestedLang;
+              updateLanguageToggle();
+              return { md: result, fallback: false };
+            }
+            return result;
+          })
+          .then(function (result) {
             try {
-              renderLesson(md);
+              renderLesson(result.md, result.fallback);
             } catch (err) {
               console.error('renderLesson failed', err);
               showError('Render error', 'Loaded the lesson markdown but failed to render it. Details in the browser console.');
@@ -1906,7 +2042,7 @@
       function updateLessonSeo(title, md) {
         var ORIGIN = 'https://aiengineeringfromscratch.com';
         var path = new URLSearchParams(location.search).get('path') || '';
-        var url = ORIGIN + '/lesson.html?path=' + path;
+        var url = ORIGIN + '/lesson.html?path=' + path + langQuery(activeLang);
         var desc = lessonDescription(md);
         var fullTitle = title + ' · AI Engineering from Scratch';
         var set = function (sel, val) { var m = document.querySelector(sel); if (m) m.setAttribute('content', val); };
@@ -1928,7 +2064,7 @@
           '@context': 'https://schema.org',
           '@graph': [
             { '@type': 'LearningResource', name: title, description: desc, url: url,
-              inLanguage: 'en', isAccessibleForFree: true,
+              inLanguage: activeLang === 'zh' ? 'zh-CN' : 'en', isAccessibleForFree: true,
               isPartOf: { '@type': 'Course', name: 'AI Engineering from Scratch', url: ORIGIN } },
             { '@type': 'BreadcrumbList', itemListElement: [
               { '@type': 'ListItem', position: 1, name: 'Home', item: ORIGIN },
@@ -1944,14 +2080,18 @@
         document.head.appendChild(s);
       }
 
-      function renderLesson(md) {
+      function renderLesson(md, usedFallback) {
         var el = document.getElementById('lessonContent');
         var html = parseMd(md);
+        if (usedFallback) {
+          html = '<div class="translation-note"><strong>中文翻译暂不可用。</strong> 已显示英文原文；生成 <code>docs/zh.md</code> 后这里会自动切换。</div>' + html;
+        }
         html += '<div class="ai-panels" id="aiPanels"></div>';
         html = addBottomNav(html);
         el.innerHTML = '<article class="lesson-article">' + html + '</article>';
 
         document.title = extractTitle(md) + ' - AI Engineering from Scratch';
+        document.documentElement.setAttribute('lang', activeLang === 'zh' ? 'zh-CN' : 'en');
         updateLessonSeo(extractTitle(md), md);
 
         initCodeCopy();
@@ -2043,7 +2183,7 @@
             if (!target) return;
             e.preventDefault();
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            history.replaceState(null, '', '#' + id);
+            history.replaceState(null, '', location.pathname + location.search + '#' + id);
             if (!target.hasAttribute('tabindex')) {
               target.setAttribute('tabindex', '-1');
               target.addEventListener('blur', function blurHandler() {
@@ -2329,10 +2469,11 @@
             var slug2 = slugify(h2[1]);
             var sectionClass = '';
             var txt = h2[1].toLowerCase();
-            if (txt.indexOf('build it') >= 0 || txt.indexOf('build ') === 0) sectionClass = ' section-build';
-            else if (txt.indexOf('use it') >= 0 || txt.indexOf('use ') === 0) sectionClass = ' section-use';
-            else if (txt.indexOf('ship it') >= 0 || txt.indexOf('ship ') === 0) sectionClass = ' section-ship';
-            if (txt.indexOf('learning objectives') >= 0) {
+            var normalizedHeading = h2[1].replace(/[：:]/g, '').trim().toLowerCase();
+            if (isBuildHeading(normalizedHeading)) sectionClass = ' section-build';
+            else if (isUseHeading(normalizedHeading)) sectionClass = ' section-use';
+            else if (isShipHeading(normalizedHeading)) sectionClass = ' section-ship';
+            if (isLearningObjectivesHeading(normalizedHeading)) {
               var objItems = [];
               for (var lo = i + 1; lo < lines.length; lo++) {
                 var loLine = lines[lo];
@@ -2344,7 +2485,7 @@
                   break;
                 }
               }
-              out += '<div class="learning-objectives"><div class="learning-objectives-title">&#127919; Learning Objectives</div><ul>';
+              out += '<div class="learning-objectives"><div class="learning-objectives-title">&#127919; ' + (activeLang === 'zh' ? '学习目标' : 'Learning Objectives') + '</div><ul>';
               for (var oi = 0; oi < objItems.length; oi++) {
                 out += '<li>' + inlineFormat(objItems[oi]) + '</li>';
               }
@@ -2352,11 +2493,11 @@
               i = lo - 1;
               continue;
             }
-            if (txt.indexOf('lab challenge') >= 0) {
+            if (isLabChallengeHeading(normalizedHeading)) {
               out += flushLabChallenge();
               inLabChallenge = true;
               out += '<div class="lab-challenge">';
-              out += '<h2 id="' + slug2 + '">&#128171; Lab Challenge</h2>';
+              out += '<h2 id="' + slug2 + '">&#128171; ' + inlineFormat(h2[1]) + '</h2>';
               continue;
             }
             out += flushLabChallenge();
@@ -2484,8 +2625,37 @@
         return text;
       }
 
+      function isLearningObjectivesHeading(text) {
+        return text.indexOf('learning objectives') >= 0 || text.indexOf('学习目标') >= 0 || text.indexOf('学习目的') >= 0;
+      }
+
+      function isBuildHeading(text) {
+        return text.indexOf('build it') >= 0 || text.indexOf('build ') === 0 || text.indexOf('构建它') >= 0 || text === '构建';
+      }
+
+      function isUseHeading(text) {
+        return text.indexOf('use it') >= 0 || text.indexOf('use ') === 0 || text.indexOf('使用它') >= 0 || text === '使用';
+      }
+
+      function isShipHeading(text) {
+        return text.indexOf('ship it') >= 0 || text.indexOf('ship ') === 0 || text.indexOf('交付它') >= 0 || text.indexOf('发布它') >= 0 || text === '交付' || text === '发布';
+      }
+
+      function isConceptHeading(text) {
+        return text === 'the concept' || text === 'concept' || text.indexOf('概念') >= 0;
+      }
+
+      function isKeyTermsHeading(text) {
+        return text === 'key terms' || text.indexOf('关键术语') >= 0 || text.indexOf('关键词') >= 0;
+      }
+
+      function isLabChallengeHeading(text) {
+        return text.indexOf('lab challenge') >= 0 || text.indexOf('实验挑战') >= 0 || text.indexOf('实践挑战') >= 0;
+      }
+
       function slugify(text) {
-        return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        var slug = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/(^-|-$)/g, '');
+        return slug || 'section';
       }
 
       function renderCodeBlock(code, lang) {
@@ -2799,9 +2969,9 @@
         var article = document.querySelector('.lesson-article');
         if (!article) return;
 
-        var conceptH2 = article.querySelector('#the-concept, #concept');
-        var buildH2 = article.querySelector('#build-it, #build');
-        var keyTermsH2 = article.querySelector('#key-terms');
+        var conceptH2 = findSectionHeading(article, isConceptHeading) || article.querySelector('#the-concept, #concept');
+        var buildH2 = findSectionHeading(article, isBuildHeading) || article.querySelector('#build-it, #build');
+        var keyTermsH2 = findSectionHeading(article, isKeyTermsHeading) || article.querySelector('#key-terms');
 
         var preQuizHtml = buildQuizHtml(questions.filter(function (q) { return q.stage === 'pre'; }), 'pre', 'Pre-Lesson Check');
         var checkQuizHtml = buildQuizHtml(questions.filter(function (q) { return q.stage === 'check'; }), 'check', 'Mid-Lesson Check');
@@ -2826,8 +2996,8 @@
 
         // Mid-lesson check: land between Build It and Use It if possible,
         // otherwise fall back to before Use It / Ship It / Key Terms.
-        var useH2 = article.querySelector('#use-it, #use');
-        var shipH2 = article.querySelector('#ship-it, #ship');
+        var useH2 = findSectionHeading(article, isUseHeading) || article.querySelector('#use-it, #use');
+        var shipH2 = findSectionHeading(article, isShipHeading) || article.querySelector('#ship-it, #ship');
         if (checkQuizHtml && useH2) {
           useH2.insertAdjacentHTML('beforebegin', checkQuizHtml);
         } else if (checkQuizHtml && shipH2) {
@@ -2845,6 +3015,15 @@
         }
 
         restoreQuizAnswers();
+      }
+
+      function findSectionHeading(article, predicate) {
+        var headings = article.querySelectorAll('h2');
+        for (var i = 0; i < headings.length; i++) {
+          var text = (headings[i].textContent || '').replace(/^[^\p{L}\p{N}]+/u, '').replace(/[：:]/g, '').trim().toLowerCase();
+          if (predicate(text)) return headings[i];
+        }
+        return null;
       }
 
       function buildQuizHtml(questions, id, title) {
@@ -2970,7 +3149,7 @@
 
         var nav = '<div class="lesson-nav-bottom">';
         if (prev) {
-          nav += '<a class="lesson-nav-btn prev" href="lesson.html?path=' + prev.path + '">';
+          nav += '<a class="lesson-nav-btn prev" href="' + lessonHref(prev.path) + '">';
           nav += '<span class="nav-label">&larr; Previous</span>';
           nav += '<span class="nav-title">' + escapeHtml(prev.lessonName) + '</span>';
           nav += '</a>';
@@ -2978,7 +3157,7 @@
           nav += '<div></div>';
         }
         if (next) {
-          nav += '<a class="lesson-nav-btn next" href="lesson.html?path=' + next.path + '">';
+          nav += '<a class="lesson-nav-btn next" href="' + lessonHref(next.path) + '">';
           nav += '<span class="nav-label">Next &rarr;</span>';
           nav += '<span class="nav-title">' + escapeHtml(next.lessonName) + '</span>';
           nav += '</a>';
@@ -3354,7 +3533,7 @@
           }
 
           if (item.flat.isReadable) {
-            html += '<a class="timeline-item ' + cls + '" href="lesson.html?path=' + item.flat.path + '" title="' + escapeAttr(item.flat.lessonName) + '">';
+            html += '<a class="timeline-item ' + cls + '" href="' + lessonHref(item.flat.path) + '" title="' + escapeAttr(item.flat.lessonName) + '">';
           } else {
             html += '<span class="timeline-item ' + cls + ' disabled" title="' + escapeAttr(item.flat.lessonName) + '">';
           }
@@ -3409,7 +3588,7 @@
 
         var phaseSlug = extractPhaseSlug(phase, phaseIdx);
         var firstLesson = phase.lessons[0] ? extractLessonSlug(phase.lessons[0], 0) : '';
-        html += '<a class="continue-link" href="lesson.html?path=phases/' + phaseSlug + '/' + firstLesson + '">Browse all Phase ' + String(phase.id).padStart(2, '0') + ' lessons</a>';
+        html += '<a class="continue-link" href="' + lessonHref('phases/' + phaseSlug + '/' + firstLesson) + '">Browse all Phase ' + String(phase.id).padStart(2, '0') + ' lessons</a>';
         html += '<a class="continue-link" href="catalog.html">Full course catalog</a>';
         html += '</div>';
 

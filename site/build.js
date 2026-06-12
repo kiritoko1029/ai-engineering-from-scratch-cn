@@ -268,6 +268,12 @@ function extractLessonMeta(relPath) {
   return result;
 }
 
+function lessonTranslations(relPath) {
+  return {
+    zh: fs.existsSync(path.join(REPO_ROOT, relPath, 'docs', 'zh.md')),
+  };
+}
+
 // ─── Parse glossary/terms.md ──────────────────────────────────────────
 function parseGlossary(content) {
   const terms = [];
@@ -424,6 +430,7 @@ function build() {
       if (lesson.url) {
         const relPath = lesson.url.replace(GITHUB_BASE, '').replace(/\/+$/, '');
         const meta = extractLessonMeta(relPath);
+        lesson.translations = lessonTranslations(relPath);
         if (meta.summary)  { lesson.summary  = meta.summary;  summarized++;   }
         if (meta.keywords) { lesson.keywords = meta.keywords; withKeywords++; }
       }
