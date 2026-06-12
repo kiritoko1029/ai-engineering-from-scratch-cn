@@ -332,6 +332,36 @@ p.dropcap::first-letter {
   opacity: 0.4;
 }
 
+.language-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--rule-soft);
+  padding: 3px;
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.language-toggle a {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.language-toggle a:hover,
+.language-toggle a.active {
+  color: var(--blueprint);
+  border-color: var(--blueprint);
+  background: var(--blueprint-tint);
+}
+
 .theme-toggle {
   background: transparent;
   border: 1px solid var(--rule-soft);
@@ -928,6 +958,15 @@ body.js-anim .toc-row.in-view {
     width: 32px;
     height: 32px;
     flex-shrink: 0;
+  }
+
+  .language-toggle {
+    padding: 2px;
+  }
+
+  .language-toggle a {
+    font-size: 0.62rem;
+    padding: 4px 6px;
   }
 
   .container {

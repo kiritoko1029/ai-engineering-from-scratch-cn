@@ -12,6 +12,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     initThemeToggle();
+    initLanguageToggle();
     populateStats();
     renderPhases();
     initStaggerIndex();
@@ -40,6 +41,50 @@
       updateThemeIcon();
     });
     updateThemeIcon();
+  }
+
+  function normalizeLessonLang(value) {
+    return value === 'zh' ? 'zh' : 'en';
+  }
+
+  function currentLessonLang() {
+    return normalizeLessonLang(localStorage.getItem('lessonLang') || 'en');
+  }
+
+  function lessonLangQuery() {
+    var lang = currentLessonLang();
+    return lang === 'zh' ? '&lang=zh' : '';
+  }
+
+  function initLanguageToggle() {
+    var toggle = document.getElementById('languageToggle');
+    if (!toggle) return;
+
+    function render() {
+      var lang = currentLessonLang();
+      var choices = toggle.querySelectorAll('[data-lang-choice]');
+      for (var i = 0; i < choices.length; i++) {
+        var choice = choices[i];
+        var choiceLang = normalizeLessonLang(choice.getAttribute('data-lang-choice'));
+        choice.classList.toggle('active', choiceLang === lang);
+        choice.setAttribute('aria-current', choiceLang === lang ? 'page' : 'false');
+      }
+      document.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en');
+    }
+
+    toggle.addEventListener('click', function (event) {
+      var link = event.target.closest('[data-lang-choice]');
+      if (!link) return;
+      event.preventDefault();
+      localStorage.setItem('lessonLang', normalizeLessonLang(link.getAttribute('data-lang-choice')));
+      render();
+      renderPhases();
+      if (currentPhaseIdx >= 0 && PHASES[currentPhaseIdx]) {
+        renderModalLessons(PHASES[currentPhaseIdx]);
+      }
+    });
+
+    render();
   }
 
   function computeStats() {
@@ -249,7 +294,7 @@
 
       var actionHtml = '';
       if ((l.status === 'complete' || userComplete) && lessonPath) {
-        actionHtml = '<a href="lesson.html?path=' + lessonPath + '" class="modal-lesson-read">' + (userComplete ? 'Review' : 'Read') + '</a>';
+        actionHtml = '<a href="lesson.html?path=' + encodeURIComponent(lessonPath) + lessonLangQuery() + '" class="modal-lesson-read">' + (userComplete ? 'Review' : 'Read') + '</a>';
       }
       var toggleHtml = '';
       if (hasProgress && lessonPath) {
