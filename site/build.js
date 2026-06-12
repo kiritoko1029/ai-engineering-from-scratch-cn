@@ -291,9 +291,17 @@ function copyLessonDocs(phases) {
         fs.copyFileSync(src, path.join(outDocs, `${lang}.md`));
         copied++;
       }
+      for (const name of ['quiz.json', 'quiz.zh.json']) {
+        const qsrc = path.join(REPO_ROOT, relPath, name);
+        if (!fs.existsSync(qsrc)) continue;
+        const outLesson = path.join(__dirname, relPath);
+        fs.mkdirSync(outLesson, { recursive: true });
+        fs.copyFileSync(qsrc, path.join(outLesson, name));
+        copied++;
+      }
     }
   }
-  console.log(`   copied ${copied} lesson doc file(s) into site/phases/`);
+  console.log(`   copied ${copied} lesson doc/quiz file(s) into site/phases/`);
 }
 
 // ─── Parse glossary/terms.md ──────────────────────────────────────────

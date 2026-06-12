@@ -1824,6 +1824,22 @@
         return path + '/docs/' + normalizeLang(lang) + '.md';
       }
 
+      function rawQuizUrl(path, file) {
+        return 'https://raw.githubusercontent.com/rohitg00/ai-engineering-from-scratch/main/' +
+          path + '/' + file;
+      }
+
+      function quizUrls(path, lang) {
+        var urls = [];
+        if (normalizeLang(lang) === 'zh') {
+          urls.push(path + '/quiz.zh.json');
+          urls.push(rawQuizUrl(path, 'quiz.zh.json'));
+        }
+        urls.push(path + '/quiz.json');
+        urls.push(rawQuizUrl(path, 'quiz.json'));
+        return urls;
+      }
+
       function updateLanguageToggle() {
         var toggle = document.getElementById('languageToggle');
         if (!toggle) return;
@@ -1973,8 +1989,6 @@
       }
 
       function fetchLesson(path) {
-        var quizUrl = 'https://raw.githubusercontent.com/rohitg00/ai-engineering-from-scratch/main/' + path + '/quiz.json';
-
         fetchLessonMarkdown(path, requestedLang)
           .catch(function () {
             if (requestedLang === 'en') throw new Error('fetch-failed');
@@ -2003,14 +2017,15 @@
               showError('Render error', 'Loaded the lesson markdown but failed to render it. Details in the browser console.');
               return;
             }
-            fetch(quizUrl)
-              .then(function (res) { return res.ok ? res.json() : null; })
-              .catch(function () { return null; })
-              .then(function (data) {
+            fetchTextWithFallback(quizUrls(path, activeLang))
+              .then(function (text) {
+                var data = null;
+                try { data = JSON.parse(text); } catch (e) { return; }
                 if (!data) return;
                 try { renderQuiz(data); }
                 catch (err) { console.error('renderQuiz failed', err); }
-              });
+              })
+              .catch(function () { /* lesson has no quiz */ });
           })
           .catch(function () {
             showError('Lesson not found', 'Could not fetch the lesson at <code>' + escapeHtml(path) + '</code>. It may not have been written yet.');

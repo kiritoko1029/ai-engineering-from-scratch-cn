@@ -54,8 +54,9 @@ Questions to answer:
 
 ### 1. Scope / Trigger
 - Trigger: adding or updating Simplified Chinese lesson translations for the static curriculum site.
-- English remains canonical in `phases/<phase>/<lesson>/docs/en.md`.
-- Chinese translations are optional per lesson and live beside English as `docs/zh.md`.
+- English remains canonical in `phases/<phase>/<lesson>/docs/en.md` and `phases/<phase>/<lesson>/quiz.json`.
+- Chinese translations are optional per lesson and live beside English as `docs/zh.md` and `quiz.zh.json`.
+- A lesson and its quiz are translated together by default; `--skip-quiz` / `--quiz-only` narrow the scope.
 
 ### 2. Signatures
 - Generate one lesson:
@@ -70,16 +71,22 @@ Questions to answer:
   ```bash
   python3 scripts/translate_lessons.py --limit 5
   ```
+- Translate only the quizzes (skip docs):
+  ```bash
+  python3 scripts/translate_lessons.py <lesson-dir> --quiz-only
+  ```
 
 ### 3. Contracts
-- Default endpoint: `LM_STUDIO_BASE_URL` or `http://127.0.0.1:1234`.
-- Default model: `LM_STUDIO_MODEL` or `hy-mt2-1.8b`.
-- Source: `docs/en.md`.
-- Target: `docs/zh.md`.
-- Existing `docs/zh.md` is skipped unless `--force` is passed.
-- `site/lesson.html?path=<lesson>&lang=zh` loads Chinese when present and falls back to English with a visible notice when missing.
-- `site/build.js` copies lesson Markdown into `site/phases/**/docs/` so Vercel's `outputDirectory: "site"` can serve the docs.
-- `site/build.js` and `scripts/build_catalog.py` expose `translations.zh` based on `docs/zh.md` presence.
+- Default endpoint: `LM_STUDIO_BASE_URL` or `http://198.18.0.1:11234`.
+- Default model: `LM_STUDIO_MODEL` or `hy-mt2-7b`.
+- Bearer token (when the LM Studio server requires one): `--api-key`, or `$LM_API_TOKEN` / `$LM_STUDIO_API_KEY` / `$OPENAI_API_KEY`.
+- Doc source/target: `docs/en.md` -> `docs/zh.md`.
+- Quiz source/target: `quiz.json` -> `quiz.zh.json` (lesson root, beside `docs/`).
+- Quiz translation rewrites only `question`, `options`, and `explanation`; `stage`, `correct`, and any other keys are preserved verbatim. Option strings that are bare code/commands are left untranslated.
+- Existing `docs/zh.md` / `quiz.zh.json` is skipped unless `--force` is passed.
+- `site/lesson.html?path=<lesson>&lang=zh` loads Chinese doc + `quiz.zh.json` when present and falls back to English (quiz falls back silently) when missing.
+- `site/build.js` copies lesson Markdown into `site/phases/**/docs/` and `quiz*.json` into `site/phases/**/` so Vercel's `outputDirectory: "site"` can serve them.
+- `site/build.js` and `scripts/build_catalog.py` expose `translations.zh` based on `docs/zh.md` presence; `quiz.zh.json` is supplementary and does not change that flag.
 
 ### 4. Validation & Error Matrix
 - Missing lesson `docs/en.md` -> CLI exits non-zero with a path error.
@@ -87,6 +94,9 @@ Questions to answer:
 - Fenced code block languages differ -> CLI exits non-zero.
 - Heading levels differ -> CLI exits non-zero.
 - Translated Markdown has no H1 or no CJK characters -> CLI exits non-zero.
+- `quiz.json` is not valid JSON -> CLI exits non-zero.
+- Quiz question count, `stage`, `correct` index, or per-question option count changes -> CLI exits non-zero.
+- Translated quiz contains no CJK characters -> CLI exits non-zero.
 
 ### 5. Good/Base/Bad Cases
 - Good: run `--dry-run` first, review preview, then generate a small batch with `--limit`.
