@@ -3,7 +3,7 @@
 
 Default target:
     http://127.0.0.1:1234/v1/chat/completions
-    model: hy-mt2-1.8b
+    model: hy-mt2-7b
 
 The script keeps English canonical at docs/en.md and writes optional
 Simplified Chinese lesson copies to docs/zh.md. It is restartable by default:
@@ -31,6 +31,7 @@ DEFAULT_MODEL = os.environ.get("LM_STUDIO_MODEL", "hy-mt2-1.8b")
 
 FENCE_RE = re.compile(r"(^```[^\n]*\n.*?^```[ \t]*$)", re.MULTILINE | re.DOTALL)
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+HEADING_LINE_RE = re.compile(r"^(#{1,6})([ \t]+)(.+?)([ \t]*)$")
 CJK_RE = re.compile(r"[\u3400-\u9fff]")
 
 
@@ -221,23 +222,74 @@ def translate_markdown(markdown: str, args: argparse.Namespace) -> str:
         if kind == "code":
             output.append(value)
             continue
-        translated_parts = [
-            translate_chunk(
-                chunk,
-                base_url=args.base_url,
-                model=args.model,
-                timeout=args.timeout,
-                retries=args.retries,
-                temperature=args.temperature,
-                max_tokens=args.max_tokens,
-                api_key=args.api_key,
-            )
-            for chunk in chunk_text(value, args.max_chars)
-        ]
-        output.append("".join(translated_parts))
+        output.append(translate_text_segment(value, args))
         if args.sleep:
             time.sleep(args.sleep)
     return "".join(output)
+
+
+def translate_text_segment(text: str, args: argparse.Namespace) -> str:
+    """Translate Markdown text while preserving ATX heading structure exactly."""
+    output: list[str] = []
+    pending_lines: list[str] = []
+
+    def flush_pending_lines() -> None:
+        if not pending_lines:
+            return
+        block = "".join(pending_lines)
+        pending_lines.clear()
+        output.extend(translate_plain_text_chunk(chunk, args) for chunk in chunk_text(block, args.max_chars))
+
+    for line in text.splitlines(keepends=True):
+        content, line_ending = split_line_ending(line)
+        if HEADING_LINE_RE.match(content):
+            flush_pending_lines()
+            output.append(translate_heading_line(content, line_ending, args))
+        else:
+            pending_lines.append(line)
+
+    flush_pending_lines()
+    return "".join(output)
+
+
+def split_line_ending(line: str) -> tuple[str, str]:
+    match = re.search(r"(\r?\n)$", line)
+    if not match:
+        return line, ""
+    return line[: match.start()], match.group(1)
+
+
+def translate_plain_text_chunk(text: str, args: argparse.Namespace) -> str:
+    return translate_chunk(
+        text,
+        base_url=args.base_url,
+        model=args.model,
+        timeout=args.timeout,
+        retries=args.retries,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens,
+        api_key=args.api_key,
+    )
+
+
+def translate_heading_line(content: str, line_ending: str, args: argparse.Namespace) -> str:
+    match = HEADING_LINE_RE.match(content)
+    if not match:
+        return content + line_ending
+
+    hashes, spacing, title, trailing = match.groups()
+    translated_title = normalize_translated_heading_title(title, translate_plain_text_chunk(title, args))
+    return f"{hashes}{spacing}{translated_title}{trailing}{line_ending}"
+
+
+def normalize_translated_heading_title(source_title: str, translated_title: str) -> str:
+    lines = [line.strip() for line in translated_title.splitlines() if line.strip()]
+    if not lines:
+        return source_title
+
+    title = lines[0]
+    title = re.sub(r"^#{1,6}\s+", "", title)
+    return title.strip() or source_title
 
 
 def fence_infos(markdown: str) -> list[str]:

@@ -63,3 +63,6 @@ catalog.json
 site/sitemap.xml
 site/llms.txt
 site/phases/
+/.agents/
+/.claude/
+/.codex/
